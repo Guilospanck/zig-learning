@@ -1,4 +1,6 @@
 const std = @import("std");
+// TODO: take a look into std.log for proper logging
+// This prints to stderr
 const print = std.debug.print;
 
 // This is defined in the `addExecutable` in `build.zig` in the section of `imports`.
@@ -9,11 +11,12 @@ const ArgParseError = error{ MissingValue, InvalidValue, UnknownValue };
 const CliArgs = struct {
     name: []const u8,
     age: u8,
+    address: []const u8,
     pub fn format(
         self: @This(),
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        try writer.print("CliArgs: {{ name = {s}, age = {d} }}\n", .{ self.name, self.age });
+        try writer.print("CliArgs: {{ \nname = {s},\nage = {d},\naddress = {s}\n}}\n", .{ self.name, self.age, self.address });
     }
 };
 
@@ -29,12 +32,19 @@ fn parseArgs() !CliArgs {
     // Remove the program name
     _ = args.next();
 
+    // FIXME: as this is getting initialised with `undefined` and it may occur
+    // that not all fields of the struct are gonna be filled (think of a user
+    // passing `--name` arg but not `--age`), we will be reading `garbage` values
+    // if we try to access `result.age`.
     var result: CliArgs = undefined;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--name")) {
             const name = args.next() orelse return ArgParseError.MissingValue;
             result.name = name;
+        } else if (std.mem.eql(u8, arg, "--address")) {
+            const address = args.next() orelse return ArgParseError.MissingValue;
+            result.address = address;
         } else if (std.mem.eql(u8, arg, "--age")) {
             const age = args.next() orelse return ArgParseError.MissingValue;
             // check if it is u8
@@ -62,7 +72,6 @@ pub fn main() !void {
     };
 
     print("{f}", .{parsedArgs});
-    print("The name is {s} and the age is {d}\n", .{ parsedArgs.name, parsedArgs.age });
 }
 
 test "simple test" {
