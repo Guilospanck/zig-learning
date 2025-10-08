@@ -6,11 +6,21 @@ const potato = @import("potato");
 
 const ArgParseError = error{ MissingValue, InvalidValue, UnknownValue };
 
-const CliArgs = struct { name: []const u8 = "Guilherme", age: u8 };
+const CliArgs = struct {
+    name: []const u8,
+    age: u8,
+    pub fn format(
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("CliArgs: {{ name = {s}, age = {d} }}\n", .{ self.name, self.age });
+    }
+};
 
 // NOTE: we can only get the args from the user because in `build.zig`
 // we allow it with `.addArgs`.
-fn parseArgs(allocator: std.mem.Allocator) !CliArgs {
+fn parseArgs() !CliArgs {
+    const allocator = std.heap.smp_allocator;
     // `try` are like `.unwrap()` in rust.
     // Do not use `try` and `catch` on the same value.
     var args = try std.process.argsWithAllocator(allocator);
@@ -19,7 +29,7 @@ fn parseArgs(allocator: std.mem.Allocator) !CliArgs {
     // Remove the program name
     _ = args.next();
 
-    var result = CliArgs{ .age = 29 };
+    var result: CliArgs = undefined;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--name")) {
@@ -46,12 +56,12 @@ pub fn main() !void {
     // Prints to stderr, ignoring potential errors.
     try potato.bufferedPrint();
 
-    const allocator = std.heap.smp_allocator;
-    const parsedArgs = parseArgs(allocator) catch |err| {
+    const parsedArgs = parseArgs() catch |err| {
         print("Error parsing args: {s}\n", .{@errorName(err)});
         return err;
     };
 
+    print("{f}", .{parsedArgs});
     print("The name is {s} and the age is {d}\n", .{ parsedArgs.name, parsedArgs.age });
 }
 
