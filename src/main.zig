@@ -20,6 +20,30 @@ const CliArgs = struct {
     }
 };
 
+fn gotoLikeSwitch() void {
+    std.debug.print("--------------- GOTO like switch --------------- \n", .{});
+    mylabel: switch (@as(u8, 1)) {
+        1 => {
+            std.debug.print("First branch\n", .{});
+            continue :mylabel 2;
+        },
+        2 => {
+            print("Second branch\n", .{});
+            continue :mylabel 3;
+        },
+        3 => {
+            std.debug.print("third branch\n", .{});
+            continue :mylabel 4;
+        },
+        4 => {},
+        5 => return, // this returns from the function that contains switch statement
+        else => {
+            std.debug.print("Unmatched", .{});
+        },
+    }
+    std.debug.print("------------------------------------------------ \n", .{});
+}
+
 // NOTE: we can only get the args from the user because in `build.zig`
 // we allow it with `.addArgs`.
 fn parseArgs() !CliArgs {
@@ -31,6 +55,8 @@ fn parseArgs() !CliArgs {
 
     // Remove the program name
     _ = args.next();
+
+    gotoLikeSwitch();
 
     // FIXME: as this is getting initialised with `undefined` and it may occur
     // that not all fields of the struct are gonna be filled (think of a user
