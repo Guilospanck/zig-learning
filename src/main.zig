@@ -3,9 +3,11 @@ const std = @import("std");
 // This prints to stderr
 const print = std.debug.print;
 
-// my own module
+// imported as files because I didn't add the module to the build.zig
 const URLBuilder = @import("url_builder.zig");
+const CustomOption = @import("option.zig");
 
+// Imported as module (this is the root.zig)
 // This is defined in the `addExecutable` in `build.zig` in the section of `imports`.
 const potato = @import("potato");
 
@@ -95,16 +97,6 @@ fn buildURLs(allocator: std.mem.Allocator) !void {
     defer allocator.free(url);
 }
 
-// TODO: create an `Option<T>` like in Zig.
-// const OptionEnum = enum {
-//     Some,
-//     None
-// };
-//
-// fn taggedUnion() void {
-//
-// }
-
 fn comptimeTest(comptime T: type) void {
     std.debug.print("The type is: {s}\n", .{@typeName(T)});
 }
@@ -135,6 +127,7 @@ pub fn main() !void {
     gotoLikeSwitch();
     print("\n", .{});
 
+    print("================ builder SECTION ================\n", .{});
     try buildURLs(allocator);
     print("\n", .{});
 
@@ -146,9 +139,18 @@ pub fn main() !void {
     // }
     //
     //     }
+    print("================ comptime SECTION ================\n", .{});
     comptimeTest(u8);
     comptimeTest(f32);
     comptimeTest([]const u8);
+    print("\n", .{});
+
+    // Option (tagged union and comptime)
+    print("================ option SECTION ================\n", .{});
+    CustomOption.optionTest(5); // None
+    CustomOption.optionTest(10); // Some
+    CustomOption.optionTest(0); // None
+    CustomOption.optionTest(18); // Some
 }
 
 test {
