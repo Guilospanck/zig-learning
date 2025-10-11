@@ -10,14 +10,14 @@ pub const Protocol = enum {
     HTTP,
     HTTPS,
 
-    fn str(self: Self) []const u8 {
+    fn str(self: @This()) []const u8 {
         return switch (self) {
             .HTTP => "http",
             .HTTPS => "https",
         };
     }
 
-    fn defaultPort(self: Self) u32 {
+    fn defaultPort(self: @This()) u32 {
         return switch (self) {
             .HTTP => 80,
             .HTTPS => 443,
