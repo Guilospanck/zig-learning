@@ -95,6 +95,20 @@ fn buildURLs(allocator: std.mem.Allocator) !void {
     defer allocator.free(url);
 }
 
+// TODO: create an `Option<T>` like in Zig.
+// const OptionEnum = enum {
+//     Some,
+//     None
+// };
+//
+// fn taggedUnion() void {
+//
+// }
+
+fn comptimeTest(comptime T: type) void {
+    std.debug.print("The type is: {s}\n", .{@typeName(T)});
+}
+
 pub fn main() !void {
     // Instantiates our allocator
     var debugAlloc: std.heap.DebugAllocator(.{}) = .init;
@@ -122,6 +136,19 @@ pub fn main() !void {
     print("\n", .{});
 
     try buildURLs(allocator);
+    print("\n", .{});
+
+    // Comptime stuff
+    // comptime {
+    // // TODO: find a way to have a list of different types (probably tagged union)
+    //         inline for ([_]{u8, f32, []const u8}) |item| {
+    //     comptimeTest(item);
+    // }
+    //
+    //     }
+    comptimeTest(u8);
+    comptimeTest(f32);
+    comptimeTest([]const u8);
 }
 
 test {
