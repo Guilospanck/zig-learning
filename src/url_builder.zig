@@ -50,3 +50,15 @@ pub fn withPort(self: *URLBuilder, port: u32) *URLBuilder {
 pub fn build(self: *URLBuilder, allocator: std.mem.Allocator) ![]const u8 {
     return try std.fmt.allocPrint(allocator, "{s}://{s}:{d}", .{ self.protocol, self.domain, self.port });
 }
+
+test "build urls" {
+    const allocator = std.testing.allocator;
+    const expected_url: []const u8 = "http://localhost:4444";
+
+    var builder = URLBuilder.init();
+
+    const url = try builder.withProtocol(.HTTP).withPort(4444).withDomain("localhost").build(allocator);
+    defer allocator.free(url);
+
+    try std.testing.expect(std.mem.eql(u8, expected_url, url));
+}

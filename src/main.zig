@@ -124,16 +124,10 @@ pub fn main() !void {
     try buildURLs(allocator);
 }
 
-test "build urls" {
-    const allocator = std.testing.allocator;
-    const expected_url: []const u8 = "http://localhost:4444";
-
-    var builder = URLBuilder.init();
-
-    const url = try builder.withProtocol(.HTTP).withPort(4444).withDomain("localhost").build(allocator);
-    defer allocator.free(url);
-
-    try std.testing.expect(std.mem.eql(u8, expected_url, url));
+test {
+    // when we run `zig build test`, it will include all imports and run their tests
+    // as well.
+    std.testing.refAllDecls(@This());
 }
 
 test "simple test" {
