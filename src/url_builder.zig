@@ -12,8 +12,8 @@ pub const Protocol = enum {
 
     fn str(self: @This()) []const u8 {
         return switch (self) {
-            .HTTP => "HTTP",
-            .HTTPS => "HTTPS",
+            .HTTP => "http",
+            .HTTPS => "https",
         };
     }
 

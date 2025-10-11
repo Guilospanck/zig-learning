@@ -84,10 +84,29 @@ fn parseArgs(allocator: std.mem.Allocator) !CliArgs {
     return result;
 }
 
+fn buildURLs(allocator: std.mem.Allocator) !void {
+    // URL builder
+    var builder = URLBuilder.init();
+    const url = try builder.withProtocol(.HTTPS).withDomain("guilospanck.com").build(allocator);
+    const url2 = try builder.withProtocol(.HTTP).withDomain("localhost").withPort(4444).build(allocator);
+    print("{s}\n{s}", .{ url, url2 });
+
+    defer allocator.free(url2);
+    defer allocator.free(url);
+}
+
 pub fn main() !void {
     // Instantiates our allocator
     var debugAlloc: std.heap.DebugAllocator(.{}) = .init;
     const allocator = debugAlloc.allocator();
+    // After we’re done with all allocations, deinit the DebugAllocator
+    // This will check for leaks, double-frees, etc.
+    defer {
+        const deinit_result = debugAlloc.deinit();
+        if (deinit_result != .ok) {
+            std.debug.print("DebugAllocator deinit reported error: {any}\n", .{deinit_result});
+        }
+    }
 
     // Prints to stderr, ignoring potential errors.
     try potato.bufferedPrint();
@@ -102,26 +121,19 @@ pub fn main() !void {
     gotoLikeSwitch();
     print("\n", .{});
 
-    // URL builder
-    var builder = URLBuilder.init();
-    const url = try builder.withProtocol(.HTTPS).withDomain("guilospanck.com").build(allocator);
-    const url2 = try builder.withProtocol(.HTTP).withDomain("localhost").withPort(4444).build(allocator);
-    print("{s}\n{s}", .{ url, url2 });
-    // Trick to have this `free` running before the `debugAlloc.deinit()`
-    // We could also just add it *after* the debugAlloc.deinit().
-    {
-        defer allocator.free(url2);
-        defer allocator.free(url);
-    }
+    try buildURLs(allocator);
+}
 
-    // 4. After you’re done with all allocations, deinit the DebugAllocator
-    //    This will check for leaks, double-frees, etc.
-    defer {
-        const deinit_result = debugAlloc.deinit();
-        if (deinit_result != .ok) {
-            std.debug.print("DebugAllocator deinit reported error: {any}\n", .{deinit_result});
-        }
-    }
+test "build urls" {
+    const allocator = std.testing.allocator;
+    const expected_url: []const u8 = "http://localhost:4444";
+
+    var builder = URLBuilder.init();
+
+    const url = try builder.withProtocol(.HTTP).withPort(4444).withDomain("localhost").build(allocator);
+    defer allocator.free(url);
+
+    try std.testing.expect(std.mem.eql(u8, expected_url, url));
 }
 
 test "simple test" {
