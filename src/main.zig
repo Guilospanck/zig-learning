@@ -3,15 +3,18 @@ const std = @import("std");
 // This prints to stderr
 const print = std.debug.print;
 
+// my own module
+const URLBuilder = @import("url_builder.zig");
+
 // This is defined in the `addExecutable` in `build.zig` in the section of `imports`.
 const potato = @import("potato");
 
 const ArgParseError = error{ MissingValue, InvalidValue, UnknownValue };
 
 const CliArgs = struct {
-    name: []const u8,
-    age: u8,
-    address: []const u8,
+    name: []const u8 = "",
+    age: u8 = 0,
+    address: []const u8 = "",
     pub fn format(
         self: @This(),
         writer: *std.Io.Writer,
@@ -46,8 +49,7 @@ fn gotoLikeSwitch() void {
 
 // NOTE: we can only get the args from the user because in `build.zig`
 // we allow it with `.addArgs`.
-fn parseArgs() !CliArgs {
-    const allocator = std.heap.smp_allocator;
+fn parseArgs(allocator: std.mem.Allocator) !CliArgs {
     // `try` are like `.unwrap()` in rust.
     // Do not use `try` and `catch` on the same value.
     var args = try std.process.argsWithAllocator(allocator);
@@ -56,13 +58,7 @@ fn parseArgs() !CliArgs {
     // Remove the program name
     _ = args.next();
 
-    gotoLikeSwitch();
-
-    // FIXME: as this is getting initialised with `undefined` and it may occur
-    // that not all fields of the struct are gonna be filled (think of a user
-    // passing `--name` arg but not `--age`), we will be reading `garbage` values
-    // if we try to access `result.age`.
-    var result: CliArgs = undefined;
+    var result = CliArgs{};
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--name")) {
@@ -89,15 +85,43 @@ fn parseArgs() !CliArgs {
 }
 
 pub fn main() !void {
+    // Instantiates our allocator
+    var debugAlloc: std.heap.DebugAllocator(.{}) = .init;
+    const allocator = debugAlloc.allocator();
+
     // Prints to stderr, ignoring potential errors.
     try potato.bufferedPrint();
 
-    const parsedArgs = parseArgs() catch |err| {
+    const parsedArgs = parseArgs(allocator) catch |err| {
         print("Error parsing args: {s}\n", .{@errorName(err)});
         return err;
     };
 
-    print("{f}", .{parsedArgs});
+    print("{f}\n", .{parsedArgs});
+
+    gotoLikeSwitch();
+    print("\n", .{});
+
+    // URL builder
+    var builder = URLBuilder.init();
+    const url = try builder.withProtocol(.HTTPS).withDomain("guilospanck.com").build(allocator);
+    const url2 = try builder.withProtocol(.HTTP).withDomain("localhost").withPort(4444).build(allocator);
+    print("{s}\n{s}", .{ url, url2 });
+    // Trick to have this `free` running before the `debugAlloc.deinit()`
+    // We could also just add it *after* the debugAlloc.deinit().
+    {
+        defer allocator.free(url2);
+        defer allocator.free(url);
+    }
+
+    // 4. After you’re done with all allocations, deinit the DebugAllocator
+    //    This will check for leaks, double-frees, etc.
+    defer {
+        const deinit_result = debugAlloc.deinit();
+        if (deinit_result != .ok) {
+            std.debug.print("DebugAllocator deinit reported error: {any}\n", .{deinit_result});
+        }
+    }
 }
 
 test "simple test" {
