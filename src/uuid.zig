@@ -150,8 +150,8 @@ fn toBEBytes(comptime InputType: type, comptime NBytes: comptime_int, input: Inp
 
     for (0..NBytes) |i| {
         const index: ShiftType = @intCast(i);
-        // we only get starting from the NBytes byte, which effectively discards the MSB of u64 if
-        // NBytes is less than 8
+        // we only get starting from the NBytes byte, which effectively discards
+        // the MSB of `InputType` if `NBytes` is less than `total_bytes`,
         const shift = (NBytes - 1 - index) * 8;
         const value: u8 = @intCast((input >> shift) & 0xFF);
         out[i] = value;
