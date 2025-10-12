@@ -36,7 +36,7 @@ const FUTURE_RESERVED: u8 = 0b1110_0000;
 
 const UUID = @This();
 
-const Error = error{HexCharsWrongLength};
+const Error = error{ HexCharsWrongLength, InvalidChar };
 
 fn removeHyphens(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
     var list = try std.ArrayList(u8).initCapacity(allocator, input.len);
@@ -44,6 +44,9 @@ fn removeHyphens(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
     for (input) |ch| {
         if (ch == HYPHEN) {
             continue;
+        }
+        if (std.mem.indexOfScalar(u8, &ALLOWED_CHARS, ch) == null) {
+            return Error.InvalidChar;
         }
         try list.append(allocator, ch);
     }
