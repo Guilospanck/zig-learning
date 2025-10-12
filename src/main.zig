@@ -131,19 +131,13 @@ pub fn main() !void {
     try buildURLs(allocator);
     print("\n", .{});
 
-    // Comptime stuff
-    // comptime {
-    // // TODO: find a way to have a list of different types (probably tagged union)
-    //         inline for ([_]{u8, f32, []const u8}) |item| {
-    //     comptimeTest(item);
-    // }
-    //
-    //     }
     print("================ comptime SECTION ================\n", .{});
-    comptimeTest(u8);
-    comptimeTest(f32);
-    comptimeTest([]const u8);
-    print("\n", .{});
+    // comptimeTest(u8);
+    // comptimeTest(f32);
+    // comptimeTest([]const u8);
+    inline for ([_]type{ u8, f32, []const u8 }) |item| {
+        comptimeTest(item);
+    }
 
     // Option (tagged union and comptime)
     print("================ option SECTION ================\n", .{});
