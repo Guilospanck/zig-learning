@@ -45,6 +45,7 @@ uuid: [16]u8 = NIL_UUID,
 const ALLOWED_CHARS = [_]u8{ 'A', 'B', 'C', 'D', 'E', 'F', 'a', 'b', 'c', 'd', 'e', 'f', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
 const HYPHEN: u8 = '-';
 const HEX_CHARS_LEN: u8 = 32; // 16 bytes turns into 32 hex chars (without counting hyphens)
+const HEX_CHARS_PLUS_HYPHEN_LEN: u8 = 36;
 
 // Variant Fields (Octet 8) (zero-based index) (https://www.rfc-editor.org/rfc/rfc9562.html#name-variant-field)
 const VARIANT_FIELD_NCS_RESERVED_BITMASK: u8 = 0b0000_0000;
@@ -72,7 +73,7 @@ const VERSION_FIELD_FUTURE_V15_BITMASK: u8 = 0b1111_0000;
 
 const UUID = @This();
 
-const Error = error{ HexCharsWrongLength, InvalidChar };
+const Error = error{ HexCharsWrongLength, InvalidChar, InvalidTimestamp };
 
 /// Function responsible for:
 /// - removing hyphens
@@ -99,6 +100,132 @@ fn preprocessUUID(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
     }
 
     return response;
+}
+
+/// Gets the bytes in Big Endian format of an u64 input.
+///
+/// An easy way of understanding this function is thinking about it as if
+/// you were looking through a window and seeing a limousine with many doors.
+///
+///                    ____________________________________________________
+/// Front of limousine |  [[0]] [[1]] [[2]] [[3]] [[4]] [[5]] [[6]] [[7]] | back of limousine
+///                    |                                                  |
+///                    |_O______________________________________________O_|
+///
+///                             >> shift direction
+///                                                                    ______
+///                                                                    |0xFF| your window
+///                                                                    ______
+///
+/// The size of window (how much you can see) is determined by 0xFF, which
+/// means "I want to see only the LSB" (so you can only see one byte (door) per time).
+///
+/// The limousine (`ms`) has 8 doors (`u64`). At each loop, we show to the window
+/// only one door. We do that by using the `shift`. Think of the shift as the
+/// limousine driving in reverse.
+///
+/// Because we're saving the bytes in Big Endian, we shift as much as we can
+/// the first time to show the first door.
+/// Then, in the next loops, we start from scratch (the position of the limousine
+/// resets), and then we shift just a bit less (one door less) than the
+/// iteration before.
+///
+fn toBEBytes(comptime InputType: type, comptime NBytes: comptime_int, input: InputType) [NBytes]u8 {
+    var out: [NBytes]u8 = undefined;
+
+    const total_bits: comptime_int = @bitSizeOf(InputType);
+    const total_bytes: comptime_int = total_bits / 8;
+
+    comptime {
+        if (@typeInfo(InputType) != .int)
+            @compileError("InputType must be an Int");
+        if (NBytes <= 0)
+            @compileError("NBytes must be > 0");
+        if (NBytes > total_bytes)
+            @compileError("NBytes must be ≤ total_bytes");
+    }
+
+    // We need the Shift type to be log2 (compiler requires)
+    const ShiftType = std.math.Log2Int(InputType);
+
+    for (0..NBytes) |i| {
+        const index: ShiftType = @intCast(i);
+        // we only get starting from the NBytes byte, which effectively discards the MSB of u64 if
+        // NBytes is less than 8
+        const shift = (NBytes - 1 - index) * 8;
+        const value: u8 = @intCast((input >> shift) & 0xFF);
+        out[i] = value;
+    }
+
+    return out;
+}
+
+/// Creates UUID version 7.
+// - 48 bits (6 bytes): Unix timestamp milliseconds
+// - 4 bits: version set to 0b0111 (7)
+// - 12 bits: random data
+// - 2 bits: variant set to 0b10 (RFC_COMPLIANT)
+// - 62 bits: random data
+pub fn v7(allocator: std.mem.Allocator) ![]const u8 {
+    // timestamp
+    const unix_ms_signed_int: i64 = std.time.milliTimestamp();
+    if (unix_ms_signed_int < 0) {
+        return Error.InvalidTimestamp;
+    }
+    const unix_ts_ms: u64 = @intCast(unix_ms_signed_int);
+    const first_48bytes_unix_ts: [6]u8 = toBEBytes(u64, 6, unix_ts_ms);
+    var unix_48bits: u48 = 0;
+    for (first_48bytes_unix_ts) |byte| {
+        unix_48bits = (unix_48bits << 8) | @as(u48, byte);
+    }
+
+    // version
+    const version: u4 = 0b0111;
+
+    const rand = std.crypto.random;
+
+    // random data (a)
+    const random_data_a: u12 = rand.int(u12);
+
+    // variant
+    const variant: u2 = 0b10;
+
+    // random data (b)
+    const random_data_b: u62 = rand.int(u62);
+
+    var uuid_v7: u128 = 0;
+    uuid_v7 = (uuid_v7 << 48) | @as(u128, unix_48bits);
+    uuid_v7 = (uuid_v7 << 4) | @as(u128, version);
+    uuid_v7 = (uuid_v7 << 12) | @as(u128, random_data_a);
+    uuid_v7 = (uuid_v7 << 2) | @as(u128, variant);
+    uuid_v7 = (uuid_v7 << 62) | @as(u128, random_data_b);
+
+    // std.debug.print("0x{x:0>32}\n: 0b{b:0>128}\n", .{ uuid_v7, uuid_v7 });
+
+    var list = try std.ArrayList(u8).initCapacity(allocator, HEX_CHARS_PLUS_HYPHEN_LEN);
+
+    // const bytes: [16]u8 = @bitCast(uuid_v7);
+    const bytes: [16]u8 = toBEBytes(u128, 16, uuid_v7);
+
+    for (bytes, 0..) |byte, i| {
+        const hex = try std.fmt.allocPrint(allocator, "{x:0>2}", .{byte});
+        try list.appendSlice(allocator, hex);
+        if (i == 3 or i == 5 or i == 7 or i == 9) {
+            try list.append(allocator, HYPHEN);
+        }
+    }
+
+    return try list.toOwnedSlice(allocator);
+}
+
+test "uuid version 7" {
+    var debugAlloc: std.heap.DebugAllocator(.{}) = .init;
+    const allocator = debugAlloc.allocator();
+
+    const uuid = try v7(allocator);
+    defer allocator.free(uuid);
+
+    std.debug.print("\nUUID: {s}\n", .{uuid});
 }
 
 // https://www.rfc-editor.org/rfc/rfc9562.html#name-variant-field
