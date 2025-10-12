@@ -6,6 +6,9 @@ const print = std.debug.print;
 // imported as files because I didn't add the module to the build.zig
 const URLBuilder = @import("url_builder.zig");
 const CustomOption = @import("option.zig");
+const MyCustomInterface = @import("interface.zig");
+const ImplInterfaceOne = @import("impl_interface_one.zig");
+const ImplInterfaceTwo = @import("impl_interface_two.zig");
 
 // Imported as module (this is the root.zig)
 // This is defined in the `addExecutable` in `build.zig` in the section of `imports`.
@@ -101,6 +104,16 @@ fn comptimeTest(comptime T: type) void {
     std.debug.print("The type is: {s}\n", .{@typeName(T)});
 }
 
+fn interfaceTest(interface: MyCustomInterface) void {
+    interface.hello();
+    interface.ping();
+    interface.setName("Guilherme") catch |err| {
+        std.debug.print("Error from setting name: {any}\n", .{err});
+    };
+    const name = interface.getName();
+    std.debug.print("The name I got was: {s}\n", .{name});
+}
+
 pub fn main() !void {
     // Instantiates our allocator
     var debugAlloc: std.heap.DebugAllocator(.{}) = .init;
@@ -145,6 +158,15 @@ pub fn main() !void {
     CustomOption.optionTest(10); // Some
     CustomOption.optionTest(0); // None
     CustomOption.optionTest(18); // Some
+
+    print("================ interfaces SECTION ================\n", .{});
+    var interfaceOne = ImplInterfaceOne{};
+    const firstInterface = interfaceOne.init("interfaceone_one");
+    interfaceTest(firstInterface);
+    print("\nNow testing interface two...\n", .{});
+    var interfaceTwo = ImplInterfaceTwo{};
+    const secInterface = interfaceTwo.init("random-uuid");
+    interfaceTest(secInterface);
 }
 
 test {
