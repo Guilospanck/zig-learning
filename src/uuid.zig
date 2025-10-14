@@ -80,6 +80,12 @@ const Error = error{ HexCharsWrongLength, InvalidChar, InvalidTimestamp };
 /// - checking length (MUST be 128 bits)
 /// - checking allowed chars
 ///
+/// Errors:
+/// - `InvalidChar` if any non-hexadecimal char in the UUID;
+/// - `HexCharsWrongLength` if after removing hyphens, the length doesn't match
+/// `HEX_CHARS_LEN`.
+/// - Other erros related to std.ArrayList.
+///
 fn preprocessUUID(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
     var list = try std.ArrayList(u8).initCapacity(allocator, input.len);
 
@@ -226,7 +232,18 @@ test "uuid version 7" {
     const uuid = try v7(allocator);
     defer allocator.free(uuid);
 
-    std.debug.print("\nUUID: {s}\n", .{uuid});
+    // preprocess result
+    const processed_uuid = try preprocessUUID(allocator, uuid);
+
+    // by here we have a uuid that at least has the valid characters and valid length.
+    var uuid_bytes: [16]u8 = undefined;
+    _ = try std.fmt.hexToBytes(&uuid_bytes, processed_uuid);
+
+    // Validate octet 8 for the variant field (should be RFC_COMPLIANT)
+    try std.testing.expect((uuid_bytes[8] & VARIANT_FIELD_RFC_COMPLIANT_BITMASK) == VARIANT_FIELD_RFC_COMPLIANT_BITMASK);
+
+    // Validate octet 6 for the version field (should be 7: 0b0111)
+    try std.testing.expect((uuid_bytes[6] & VERSION_FIELD_V07_BITMASK) == VERSION_FIELD_V07_BITMASK);
 }
 
 // https://www.rfc-editor.org/rfc/rfc9562.html#name-variant-field
