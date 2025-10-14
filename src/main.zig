@@ -9,6 +9,7 @@ const CustomOption = @import("option.zig");
 const MyCustomInterface = @import("interface.zig");
 const ImplInterfaceOne = @import("impl_interface_one.zig");
 const ImplInterfaceTwo = @import("impl_interface_two.zig");
+const UUID = @import("uuid.zig");
 
 // Imported as module (this is the root.zig)
 // This is defined in the `addExecutable` in `build.zig` in the section of `imports`.
@@ -161,11 +162,16 @@ pub fn main() !void {
 
     print("================ interfaces SECTION ================\n", .{});
     var interfaceOne = ImplInterfaceOne{};
-    const firstInterface = interfaceOne.init("interfaceone_one");
+    const uuid = try UUID.v7(allocator);
+    defer allocator.free(uuid);
+    const firstInterface = interfaceOne.init(uuid);
     interfaceTest(firstInterface);
+
+    const uuid2 = try UUID.v7(allocator);
+    defer allocator.free(uuid2);
     print("\nNow testing interface two...\n", .{});
     var interfaceTwo = ImplInterfaceTwo{};
-    const secInterface = interfaceTwo.init("random-uuid");
+    const secInterface = interfaceTwo.init(uuid2);
     interfaceTest(secInterface);
 }
 

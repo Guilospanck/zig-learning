@@ -179,7 +179,7 @@ pub fn v7(allocator: std.mem.Allocator) ![]const u8 {
         unix_48bits = (unix_48bits << 8) | @as(u48, byte);
     }
 
-    // version
+    // version (7)
     const version: u4 = 0b0111;
 
     const rand = std.crypto.random;
@@ -187,7 +187,7 @@ pub fn v7(allocator: std.mem.Allocator) ![]const u8 {
     // random data (a)
     const random_data_a: u12 = rand.int(u12);
 
-    // variant
+    // variant (RFC_COMPLIANT)
     const variant: u2 = 0b10;
 
     // random data (b)
@@ -204,11 +204,12 @@ pub fn v7(allocator: std.mem.Allocator) ![]const u8 {
 
     var list = try std.ArrayList(u8).initCapacity(allocator, HEX_CHARS_PLUS_HYPHEN_LEN);
 
-    // const bytes: [16]u8 = @bitCast(uuid_v7);
-    const bytes: [16]u8 = toBEBytes(u128, 16, uuid_v7);
+    const bytes: [16]u8 = toBEBytes(u128, 16, uuid_v7); // const bytes: [16]u8 = @bitCast(uuid_v7);
 
     for (bytes, 0..) |byte, i| {
         const hex = try std.fmt.allocPrint(allocator, "{x:0>2}", .{byte});
+        defer allocator.free(hex);
+
         try list.appendSlice(allocator, hex);
         if (i == 3 or i == 5 or i == 7 or i == 9) {
             try list.append(allocator, HYPHEN);

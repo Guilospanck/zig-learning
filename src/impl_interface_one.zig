@@ -43,7 +43,6 @@ pub fn setName(ptr: *anyopaque, name: []const u8) Error!void {
 }
 
 pub fn init(self: *ImplInterfaceOne, id: []const u8) MyCustomInterface {
-    // TODO: implement uuid
     self.id = id;
 
     return .{
