@@ -28,7 +28,7 @@ const MAX_UUID: [16]u8 = [_]u8{ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
 
 uuid: [16]u8 = NIL_UUID,
 
-const ALLOWED_CHARS = [_]u8{ 'A', 'B', 'C', 'D', 'E', 'F', 'a', 'b', 'c', 'd', 'e', 'f', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+const ALLOWED_CHARS = [_]u8{ 'A', 'B', 'C', 'D', 'E', 'F', 'a', 'b', 'c', 'd', 'e', 'f', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }; // only hexadecimal allowed
 const HYPHEN: u8 = '-';
 const HEX_CHARS_LEN: u8 = 32; // 16 bytes turns into 32 hex chars (without counting hyphens)
 const HEX_CHARS_PLUS_HYPHEN_LEN: u8 = 36;
@@ -111,7 +111,7 @@ fn preprocessUUID(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
 //                                                                     ______
 //
 //
-// The size of window (how much you can see) is determined by 0xFF, which
+// The size of the window (how much you can see) is determined by 0xFF, which
 // means "I want to see only the LSB - Least Significant Byte" (so you can only see one byte (door) per time).
 //
 // The limousine (`input`) has `@bitSizeOf(InputType) / 8` doors.
@@ -122,7 +122,9 @@ fn preprocessUUID(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
 // limousine driving in reverse.
 //
 // Because we're saving the bytes in Big Endian, we shift as much as we can (NBytes - 1)
-// the first time to the RIGHT to show the first door.
+// the first time to the RIGHT to show the first door we want (the NBytes door).
+// In our example, if NBytes is 3 (meaning we only want the first 3 LSBs of our input),
+// then the first door we're gonna see through the window is the byte 5.
 //
 // Then, in the next loops, we start from scratch (the position of the limousine
 // resets), and then we shift just a byte less (one door less) than the
