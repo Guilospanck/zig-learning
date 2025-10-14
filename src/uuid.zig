@@ -254,6 +254,8 @@ test "validate variant fields" {
     const VariantTest = struct { raw_uuid: []const u8, bitmask_test: u8 };
 
     var list = try std.ArrayList(VariantTest).initCapacity(allocator, @sizeOf(VariantTest) * 4);
+    defer list.deinit(allocator);
+
     try list.append(allocator, .{ .raw_uuid = "f81d4fae-7dec-11a7-0065-00a0c91e6bf6", .bitmask_test = VARIANT_FIELD_NCS_RESERVED_BITMASK });
     //                                                        ^^
     try list.append(allocator, .{ .raw_uuid = "f81d4fae-7dec-11a7-8065-00a0c91e6bf6", .bitmask_test = VARIANT_FIELD_RFC_COMPLIANT_BITMASK });
@@ -296,6 +298,8 @@ test "validate version field" {
     };
 
     var list = try std.ArrayList(VersionTest).initCapacity(allocator, @sizeOf(VersionTest) * 16);
+    defer list.deinit(allocator);
+
     try list.append(allocator, .{ .raw_uuid = "f81d4fae-7dec-00d0-a765-00a0c91e6bf6", .bitmask_test = VERSION_FIELD_UNUSED_BITMASK });
     //                                                       ^^
     try list.append(allocator, .{ .raw_uuid = "f81d4fae-7dec-10d0-a765-00a0c91e6bf6", .bitmask_test = VERSION_FIELD_V01_BITMASK });
