@@ -20,21 +20,7 @@
 //                    (40)        (80)      (120)   bits
 //            4HOc    -2HOc-2HOc-2HOc- 6HOctet
 //
-// This is how the bits are laid out in v7:
 //
-//  0                   1                   2                   3
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                           unix_ts_ms                          |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |          unix_ts_ms           |  ver  |       rand_a          |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |var|                        rand_b                             |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                            rand_b                             |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
-
 const std = @import("std");
 
 const NIL_UUID: [16]u8 = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -108,34 +94,91 @@ fn preprocessUUID(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
     return response;
 }
 
-/// Gets the bytes in Big Endian format of an u64 input.
+/// Gets 'NBytes' bytes in Big Endian format of an input.
 ///
-/// An easy way of understanding this function is thinking about it as if
-/// you were looking through a window and seeing a limousine with many doors.
 ///
-///                    ____________________________________________________
-/// Front of limousine |  [[0]] [[1]] [[2]] [[3]] [[4]] [[5]] [[6]] [[7]] | back of limousine
-///                    |                                                  |
-///                    |_O______________________________________________O_|
-///
-///                             >> shift direction
-///                                                                    ______
-///                                                                    |0xFF| your window
-///                                                                    ______
-///
-/// The size of window (how much you can see) is determined by 0xFF, which
-/// means "I want to see only the LSB" (so you can only see one byte (door) per time).
-///
-/// The limousine (`ms`) has 8 doors (`u64`). At each loop, we show to the window
-/// only one door. We do that by using the `shift`. Think of the shift as the
-/// limousine driving in reverse.
-///
-/// Because we're saving the bytes in Big Endian, we shift as much as we can
-/// the first time to show the first door.
-/// Then, in the next loops, we start from scratch (the position of the limousine
-/// resets), and then we shift just a bit less (one door less) than the
-/// iteration before.
-///
+// An easy way of understanding this function is thinking about it as if
+// you were looking through a window and seeing a limousine with many doors.
+//
+//                        ____________________________________________________
+//     Front of limousine |  [[0]] [[1]] [[2]] [[3]] [[4]] [[5]] [[6]] [[7]] | back of limousine
+//                        |                                                  |
+//                        |_O______________________________________________O_|
+//
+//                                 >> shift direction
+//                                                                     ______
+//                                                                     |0xFF| your window
+//                                                                     ______
+//
+//
+// The size of window (how much you can see) is determined by 0xFF, which
+// means "I want to see only the LSB - Least Significant Byte" (so you can only see one byte (door) per time).
+//
+// The limousine (`input`) has `@bitSizeOf(InputType) / 8` doors.
+// So, for example, for a InputType of u64, it would have 8 doors.
+//
+// At each loop, we show inside the window only one door.
+// We do that by using the `shift`. Think of the shift as the
+// limousine driving in reverse.
+//
+// Because we're saving the bytes in Big Endian, we shift as much as we can (NBytes - 1)
+// the first time to the RIGHT to show the first door.
+//
+// Then, in the next loops, we start from scratch (the position of the limousine
+// resets), and then we shift just a byte less (one door less) than the
+// iteration before. We do it until the last door is shown inside the window.
+//
+//
+// EXAMPLE: NBytes (the amount of bytes in our result that we want) is 3 and
+// our limousine is u64 => therefore 8 bytes = 8 doors.
+//
+// First loop: records byte 5
+//    - shift is: NBytes - 1 - index = 3 - 1 - 0 = 2: move 2 bytes to the right
+//
+//                                                                          |
+//                                    ______________________________________|______________
+//                 Front of limousine |  [[0]] [[1]] [[2]] [[3]] [[4]] [[5]]| [[6]] [[7]] | back of limousine
+//                                    |                                     |             |
+//                                    |_O___________________________________|___________O_|
+//                                                                          |
+//                                                                          |
+//                             >> shift direction
+//                                                                    ______
+//                                                                    |0xFF| your window
+//                                                                    ______
+//
+// Second loop: records byte 6
+//    - shift is: NBytes - 1 - index = 3 - 1 - 1 = 1: move 1 byte to the right
+//
+//                                                                          |
+//                              ____________________________________________|________
+//           Front of limousine |  [[0]] [[1]] [[2]] [[3]] [[4]] [[5]] [[6]]| [[7]] | back of limousine
+//                              |                                           |       |
+//                              |_O_________________________________________|_____O_|
+//                                                                          |
+//                                                                          |
+//                             >> shift direction
+//                                                                    ______
+//                                                                    |0xFF| your window
+//                                                                    ______
+//
+// Third loop: records byte 7
+//    - shift is: NBytes - 1 - index = 3 - 1 - 2 = 0: move 0 byte to the right
+//
+//
+//                       ___________________________________________________|
+//    Front of limousine |  [[0]] [[1]] [[2]] [[3]] [[4]] [[5]] [[6]] [[7]] | back of limousine
+//                       |                                                  |
+//                       |_O______________________________________________O_|
+//                                                                          |
+//
+//
+//                             >> shift direction
+//                                                                    ______
+//                                                                    |0xFF| your window
+//                                                                    ______
+//
+//
 fn toBEBytes(comptime InputType: type, comptime NBytes: comptime_int, input: InputType) [NBytes]u8 {
     var out: [NBytes]u8 = undefined;
 
@@ -167,11 +210,25 @@ fn toBEBytes(comptime InputType: type, comptime NBytes: comptime_int, input: Inp
 }
 
 /// Creates UUID version 7.
+///
 // - 48 bits (6 bytes): Unix timestamp milliseconds
 // - 4 bits: version set to 0b0111 (7)
 // - 12 bits: random data
 // - 2 bits: variant set to 0b10 (RFC_COMPLIANT)
 // - 62 bits: random data
+//
+//  0                   1                   2                   3
+//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                           unix_ts_ms                          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |          unix_ts_ms           |  ver  |       rand_a          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |var|                        rand_b                             |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                            rand_b                             |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//
 pub fn v7(allocator: std.mem.Allocator) ![]const u8 {
     // timestamp
     const unix_ms_signed_int: i64 = std.time.milliTimestamp();
