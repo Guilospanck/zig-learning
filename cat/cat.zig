@@ -2,7 +2,7 @@ const std = @import("std");
 
 const ArgsParseError = error{InvalidArgsLength};
 
-fn getFilepathFromArgs(allocator: std.mem.Allocator) ![]const u8 {
+fn getFilepathFromArgs(allocator: std.mem.Allocator) ArgsParseError![]const u8 {
     var args = try std.process.argsWithAllocator(allocator);
     defer args.deinit();
 
@@ -55,8 +55,13 @@ pub fn main() !void {
     }
 
     const filepath = getFilepathFromArgs(allocator) catch |err| {
-        std.debug.print("Some error {any}", .{err});
-        return;
+        switch (err) {
+            ArgsParseError.InvalidArgsLength => {
+                std.debug.print("You have to pass exactly one argument to `cat`\n", .{});
+                return;
+            },
+            else => unreachable,
+        }
     };
 
     try readFileAndPrintToStdout(filepath);
