@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const echo = @This();
-
 pub fn main() !void {
     var buf: [512]u8 = undefined;
     var w = std.fs.File.stdout().writer(&buf);
